@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>冒險者旅程 Quest Log</title>
+    
+    <!-- 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- 引入 Babel 用來解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 設定 Tailwind 的顏色配置 (莫蘭迪色系) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#1f2937', 
+                            900: '#0f172a',
+                        },
+                        // 莫蘭迪藍/青色系 (Teal)
+                        teal: {
+                            600: '#319795',
+                            700: '#2c7a7b',
+                            800: '#285e61',
+                            900: '#234e52',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* 避免讀取時閃爍 */
+        body { opacity: 0; animation: fadeIn 0.5s forwards; }
+        @keyframes fadeIn { to { opacity: 1; } }
+        
+        /* 捲軸美化 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // ---------------------------------------------------------------------
+        // 內建圖示組件 (SVG Icons)
+        // ---------------------------------------------------------------------
+        const Icon = ({ path, size = 24, className = "" }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                {path}
+            </svg>
+        );
+
+        const Icons = {
+            Map: (props) => <Icon {...props} path={<><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>} />,
+            Calendar: (props) => <Icon {...props} path={<><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>} />,
+            CheckSquare: (props) => <Icon {...props} path={<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>} />,
+            Plus: (props) => <Icon {...props} path={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>} />,
+            Trash2: (props) => <Icon {...props} path={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>} />,
+            Shield: (props) => <Icon {...props} path={<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>} />,
+            Trophy: (props) => <Icon {...props} path={<><path d="M8 21h8"/><path d="M12 17a7 7 0 0 0-7-7v-3a3 3 0 0 1 6 0"/><path d="M12 17a7 7 0 0 0 7-7v-3a3 3 0 0 1-6 0"/></>} />,
+            Award: (props) => <Icon {...props} path={<><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></>} />,
+            Package: (props) => <Icon {...props} path={<><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>} />,
+            ArrowLeft: (props) => <Icon {...props} path={<><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></>} />,
+            Archive: (props) => <Icon {...props} path={<><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></>} />,
+            CheckCircle: (props) => <Icon {...props} path={<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>} />,
+        };
+
+        // ---------------------------------------------------------------------
+        // 主應用程式 (App)
+        // ---------------------------------------------------------------------
+        function App() {
+            // 狀態管理
+            const [playerStats, setPlayerStats] = useState(() => {
+                const saved = localStorage.getItem('questLog_stats');
+                return saved ? JSON.parse(saved) : { level: 1, xp: 0, title: '新手冒險家' };
+            });
+
+            const [quests, setQuests] = useState(() => {
+                const saved = localStorage.getItem('questLog_quests');
+                return saved ? JSON.parse(saved) : [];
+            });
+
+            const [view, setView] = useState('dashboard');
+            const [activeQuestId, setActiveQuestId] = useState(null);
+
+            // 儲存邏輯
+            useEffect(() => {
+                localStorage.setItem('questLog_stats', JSON.stringify(playerStats));
+            }, [playerStats]);
+
+            useEffect(() => {
+                localStorage.setItem('questLog_quests', JSON.stringify(quests));
+            }, [quests]);
+
+            // 升級邏輯
+            const gainXp = (amount) => {
+                setPlayerStats(prev => {
+                    const newXp = prev.xp + amount;
+                    const nextLevelXp = prev.level * 100;
+                    let newLevel = prev.level;
+                    let newTitle = prev.title;
+
+                    if (newXp >= nextLevelXp) {
+                        newLevel += 1;
+                        if (newLevel >= 5) newTitle = '熟練的旅人';
+                        if (newLevel >= 10) newTitle = '地圖繪製者';
+                        if (newLevel >= 20) newTitle = '傳說級導遊';
+                    }
+                    return { ...prev, xp: newXp, level: newLevel, title: newTitle };
+                });
+            };
+
+            // 任務操作
+            const createQuest = (title, destination) => {
+                const newQuest = {
+                    id: Date.now(),
+                    title,
+                    destination,
+                    status: 'active',
+                    days: [],
+                    inventory: [],
+                    progress: 0
+                };
+                setQuests([...quests, newQuest]);
+                gainXp(50);
+                setView('dashboard');
+            };
+
+            const deleteQuest = (id) => {
+                if (confirm('確定要放棄這個任務嗎？(刪除後無法復原)')) {
+                    setQuests(quests.filter(q => q.id !== id));
+                    if (activeQuestId === id) setView('dashboard');
+                }
+            };
+
+            const completeQuest = (id) => {
+                if (confirm('恭喜完成旅程！要將此任務歸檔到「冒險傳說」中嗎？')) {
+                    setQuests(quests.map(q => q.id === id ? { ...q, status: 'completed' } : q));
+                    gainXp(200);
+                    setView('dashboard');
+                }
+            };
+
+            const reactivateQuest = (id) => {
+                setQuests(quests.map(q => q.id === id ? { ...q, status: 'active' } : q));
+                setView('dashboard');
+            };
+
+            const openQuest = (id) => {
+                setActiveQuestId(id);
+                setView('planner');
+            };
+
+            // 渲染畫面
+            return (
+                <div className="min-h-screen bg-slate-900 text-slate-200 font-sans selection:bg-slate-600 selection:text-slate-100">
+                    <header className="bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-50 shadow-lg">
+                        <div className="max-w-4xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setView('dashboard')}>
+                                <div className="bg-slate-700 p-2 rounded-lg text-slate-300 group-hover:bg-slate-600 transition-colors">
+                                    <Icons.Map size={24} />
+                                </div>
+                                <div>
+                                    <h1 className="font-bold text-lg text-slate-300 group-hover:text-slate-200 transition-colors">冒險者旅程</h1>
+                                    <p className="text-xs text-slate-500">QUEST LOG</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-4 bg-slate-900 py-2 px-4 rounded-full border border-slate-700">
+                                <div className="flex flex-col items-end">
+                                    <span className="text-xs text-blue-300 font-bold tracking-wider">{playerStats.title}</span>
+                                    <div className="text-sm font-mono text-slate-400">LV. {playerStats.level}</div>
+                                </div>
+                                <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                    <div 
+                                        className="h-full bg-gradient-to-r from-blue-400 to-slate-400 transition-all duration-500 opacity-70"
+                                        style={{ width: `${(playerStats.xp % (playerStats.level * 100)) / (playerStats.level * 100) * 100}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-4xl mx-auto p-4 md:p-6 pb-20">
+                        {view === 'dashboard' && (
+                            <Dashboard 
+                                quests={quests} 
+                                onCreate={() => setView('creator')} 
+                                onOpen={openQuest}
+                                onDelete={deleteQuest}
+                                onReactivate={reactivateQuest}
+                            />
+                        )}
+                        
+                        {view === 'creator' && (
+                            <QuestCreator 
+                                onCancel={() => setView('dashboard')} 
+                                onSubmit={createQuest} 
+                            />
+                        )}
+
+                        {view === 'planner' && activeQuestId && (
+                            <QuestPlanner 
+                                quest={quests.find(q => q.id === activeQuestId)} 
+                                onUpdate={(updatedQuest) => {
+                                    setQuests(quests.map(q => q.id === updatedQuest.id ? updatedQuest : q));
+                                }}
+                                onBack={() => setView('dashboard')}
+                                onComplete={completeQuest}
+                                gainXp={gainXp}
+                            />
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        // ---------------------------------------------------------------------
+        // Dashboard 組件
+        // ---------------------------------------------------------------------
+        function Dashboard({ quests, onCreate, onOpen, onDelete, onReactivate }) {
+            const [tab, setTab] = useState('active'); 
+            const activeQuests = quests.filter(q => q.status === 'active' || !q.status);
+            const completedQuests = quests.filter(q => q.status === 'completed');
+            const displayQuests = tab === 'active' ? activeQuests : completedQuests;
+
+            return (
+                <div className="animate-fade-in">
+                    <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-200">任務佈告欄</h2>
+                            <p className="text-slate-500 mt-1">選擇你的冒險，或者開始一個新的旅程。</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setTab('active')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${tab === 'active' ? 'bg-slate-700 text-blue-200' : 'text-slate-500 hover:text-slate-300'}`}>
+                                進行中 ({activeQuests.length})
+                            </button>
+                            <button onClick={() => setTab('completed')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${tab === 'completed' ? 'bg-slate-700 text-blue-200' : 'text-slate-500 hover:text-slate-300'}`}>
+                                <Icons.Archive size={16} /> 冒險傳說 ({completedQuests.length})
+                            </button>
+                        </div>
+                    </div>
+
+                    {tab === 'active' && (
+                        <div className="mb-6">
+                           <button onClick={onCreate} className="w-full md:w-auto bg-slate-600 hover:bg-slate-500 text-slate-100 font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-slate-500/20 active:scale-95">
+                                <Icons.Plus size={20} /> 接受新委託
+                            </button>
+                        </div>
+                    )}
+
+                    {displayQuests.length === 0 ? (
+                        <div className="text-center py-20 bg-slate-800/50 rounded-2xl border-2 border-dashed border-slate-700">
+                            {tab === 'active' ? (
+                                <>
+                                    <div className="flex justify-center mb-4 text-slate-600"><Icons.Shield size={48} /></div>
+                                    <h3 className="text-xl text-slate-400">目前沒有進行中的冒險</h3>
+                                    <p className="text-slate-500 mt-2">點擊上方按鈕開始規劃！</p>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex justify-center mb-4 text-slate-600"><Icons.Trophy size={48} /></div>
+                                    <h3 className="text-xl text-slate-400">尚無完成的傳說</h3>
+                                    <p className="text-slate-500 mt-2">完成你的第一個旅程來寫下歷史。</p>
+                                </>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="grid gap-4 md:grid-cols-2">
+                            {displayQuests.map(quest => (
+                                <div key={quest.id} className={`bg-slate-800 border rounded-xl p-5 transition-all cursor-pointer group relative overflow-hidden ${tab === 'completed' ? 'border-slate-700 opacity-60 hover:opacity-100' : 'border-slate-700 hover:border-blue-400/30'}`} onClick={() => onOpen(quest.id)}>
+                                    <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                        {tab === 'completed' && (
+                                            <button onClick={(e) => { e.stopPropagation(); onReactivate(quest.id); }} className="p-2 bg-slate-700/80 hover:bg-slate-600 rounded-full text-slate-300 hover:text-white transition-colors">
+                                                <Icons.Plus size={16} />
+                                            </button>
+                                        )}
+                                         <button onClick={(e) => { e.stopPropagation(); onDelete(quest.id); }} className="p-2 bg-slate-700/80 hover:bg-red-900/50 rounded-full text-slate-400 hover:text-red-200 transition-colors">
+                                            <Icons.Trash2 size={16} />
+                                        </button>
+                                    </div>
+
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div>
+                                            <h3 className={`text-xl font-bold transition-colors ${tab === 'completed' ? 'text-slate-500' : 'text-slate-200 group-hover:text-blue-200'}`}>{quest.title}</h3>
+                                            <div className="flex items-center gap-2 text-slate-500 mt-1 text-sm">
+                                                <Icons.Map size={14} /> <span>{quest.destination}</span>
+                                                {tab === 'completed' && <span className="bg-slate-700 text-slate-400 text-xs px-2 py-0.5 rounded ml-2">已完成</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs text-slate-500 uppercase tracking-wider font-bold">
+                                            <span>完成度</span><span>{quest.progress || 0}%</span>
+                                        </div>
+                                        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                                            <div className={`h-full ${tab === 'completed' ? 'bg-slate-600' : 'bg-teal-700'}`} style={{ width: `${quest.progress || 0}%` }}></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ---------------------------------------------------------------------
+        // QuestCreator 組件
+        // ---------------------------------------------------------------------
+        function QuestCreator({ onCancel, onSubmit }) {
+            const [title, setTitle] = useState('');
+            const [dest, setDest] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (!title.trim() || !dest.trim()) return;
+                onSubmit(title, dest);
+            };
+
+            return (
+                <div className="max-w-md mx-auto animate-slide-up">
+                    <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl shadow-black/20">
+                        <h2 className="text-2xl font-bold text-slate-300 mb-6 flex items-center gap-2">
+                            <Icons.Award size={24} className="text-blue-300" /> 撰寫冒險契約
+                        </h2>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-500 mb-2 uppercase tracking-wide">任務名稱 (旅程標題)</label>
+                                <input autoFocus type="text" placeholder="例如：東京究極美食之旅" className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-slate-200 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-all placeholder:text-slate-600" value={title} onChange={e => setTitle(e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-500 mb-2 uppercase tracking-wide">目的地 (冒險區域)</label>
+                                <input type="text" placeholder="例如：日本, 東京" className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-slate-200 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-all placeholder:text-slate-600" value={dest} onChange={e => setDest(e.target.value)} />
+                            </div>
+                            <div className="flex gap-3 pt-4">
+                                <button type="button" onClick={onCancel} className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold text-slate-400 transition-colors">取消</button>
+                                <button type="submit" disabled={!title || !dest} className="flex-1 py-3 bg-slate-600 hover:bg-slate-500 disabled:bg-slate-800 disabled:text-slate-600 rounded-lg font-bold text-slate-200 transition-all flex justify-center items-center gap-2">簽署契約 (建立)</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        // ---------------------------------------------------------------------
+        // QuestPlanner 組件
+        // ---------------------------------------------------------------------
+        function QuestPlanner({ quest, onUpdate, onBack, gainXp, onComplete }) {
+            const [activeTab, setActiveTab] = useState('itinerary');
+            const [newDayDate, setNewDayDate] = useState('');
+            const isCompleted = quest.status === 'completed';
+
+            useEffect(() => {
+                let totalItems = 0;
+                let checkedItems = 0;
+                quest.days.forEach(day => {
+                    totalItems += day.encounters.length;
+                    checkedItems += day.encounters.filter(e => e.checked).length;
+                });
+                totalItems += quest.inventory.length;
+                checkedItems += quest.inventory.filter(i => i.packed).length;
+                const progress = totalItems === 0 ? 0 : Math.round((checkedItems / totalItems) * 100);
+                if (progress !== quest.progress) onUpdate({ ...quest, progress });
+            }, [quest.days, quest.inventory]);
+
+            const addDay = () => {
+                if (!newDayDate) return;
+                const newDay = { id: Date.now(), date: newDayDate, encounters: [] };
+                onUpdate({ ...quest, days: [...quest.days, newDay].sort((a, b) => new Date(a.date) - new Date(b.date)) });
+                setNewDayDate('');
+                gainXp(20);
+            };
+
+            const addEncounter = (dayId, text) => {
+                const updatedDays = quest.days.map(day => {
+                    if (day.id === dayId) return { ...day, encounters: [...day.encounters, { id: Date.now(), text, checked: false }] };
+                    return day;
+                });
+                onUpdate({ ...quest, days: updatedDays });
+                gainXp(10);
+            };
+
+            const toggleEncounter = (dayId, encounterId) => {
+                const updatedDays = quest.days.map(day => {
+                    if (day.id === dayId) return {
+                        ...day,
+                        encounters: day.encounters.map(enc => {
+                            if (enc.id === encounterId) {
+                                const newState = !enc.checked;
+                                if (newState && !isCompleted) gainXp(5);
+                                return { ...enc, checked: newState };
+                            }
+                            return enc;
+                        })
+                    };
+                    return day;
+                });
+                onUpdate({ ...quest, days: updatedDays });
+            };
+
+            const removeEncounter = (dayId, encounterId) => {
+                 const updatedDays = quest.days.map(day => {
+                    if (day.id === dayId) return { ...day, encounters: day.encounters.filter(e => e.id !== encounterId) };
+                    return day;
+                });
+                onUpdate({ ...quest, days: updatedDays });
+            };
+
+            const addItem = (itemText) => {
+                onUpdate({ ...quest, inventory: [...quest.inventory, { id: Date.now(), item: itemText, packed: false }] });
+                gainXp(5);
+            };
+
+            const toggleItem = (itemId) => {
+                onUpdate({
+                    ...quest,
+                    inventory: quest.inventory.map(i => {
+                        if (i.id === itemId) {
+                           if (!i.packed && !isCompleted) gainXp(2);
+                           return { ...i, packed: !i.packed };
+                        }
+                        return i;
+                    })
+                });
+            };
+
+            const removeItem = (itemId) => {
+                 onUpdate({ ...quest, inventory: quest.inventory.filter(i => i.id !== itemId) });
+            };
+
+            return (
+                <div className="animate-fade-in">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                        <div className="flex items-center gap-4">
+                            <button onClick={onBack} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"><Icons.ArrowLeft size={20} /></button>
+                            <div>
+                                <h2 className="text-2xl font-bold text-slate-200 flex items-center gap-2">
+                                    {quest.title}
+                                    {isCompleted && <span className="bg-slate-700 text-slate-400 text-xs px-2 py-1 rounded-full border border-slate-600">已歸檔</span>}
+                                </h2>
+                                <div className="flex items-center gap-2 text-slate-500 text-sm">
+                                    <span>{quest.destination}</span>
+                                    <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
+                                    <span className="text-teal-600/80">進度 {quest.progress || 0}%</span>
+                                </div>
+                            </div>
+                        </div>
+                        {!isCompleted && (
+                            <button onClick={() => onComplete(quest.id)} className="bg-teal-800/80 hover:bg-teal-700 text-teal-100 font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all shadow-lg hover:shadow-teal-900/40">
+                                <Icons.CheckCircle size={18} /> 完成這趟旅程
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="flex gap-2 mb-6 bg-slate-800/50 p-1 rounded-lg inline-flex">
+                        <button onClick={() => setActiveTab('itinerary')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'itinerary' ? 'bg-slate-600 text-slate-100 shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>
+                            <Icons.Map size={16} /> 行程卷軸
+                        </button>
+                        <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'inventory' ? 'bg-slate-600 text-slate-100 shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>
+                            <Icons.Package size={16} /> 裝備清單
+                        </button>
+                    </div>
+
+                    {activeTab === 'itinerary' && (
+                        <div className="space-y-6">
+                            {!isCompleted && (
+                                <div className="bg-slate-800 border border-slate-700 p-4 rounded-xl flex gap-3 items-end">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">新增冒險日</label>
+                                        <input type="date" className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-slate-200 outline-none focus:border-slate-500" value={newDayDate} onChange={e => setNewDayDate(e.target.value)} />
+                                    </div>
+                                    <button onClick={addDay} className="bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2.5 rounded-lg font-bold transition-colors">開啟新篇章</button>
+                                </div>
+                            )}
+                            <div className="space-y-6">
+                                {quest.days.map((day, index) => (
+                                    <DayCard key={day.id} day={day} index={index} readOnly={isCompleted} onAddEncounter={(text) => addEncounter(day.id, text)} onToggleEncounter={(encId) => toggleEncounter(day.id, encId)} onRemoveEncounter={(encId) => removeEncounter(day.id, encId)} />
+                                ))}
+                                {quest.days.length === 0 && <div className="text-center py-10 text-slate-500">尚未規劃任何日期。</div>}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'inventory' && (
+                        <InventoryPanel inventory={quest.inventory} readOnly={isCompleted} onAdd={addItem} onToggle={toggleItem} onRemove={removeItem} />
+                    )}
+                </div>
+            );
+        }
+
+        function DayCard({ day, index, onAddEncounter, onToggleEncounter, onRemoveEncounter, readOnly }) {
+            const [input, setInput] = useState('');
+            const handleAdd = (e) => { e.preventDefault(); if (!input.trim()) return; onAddEncounter(input); setInput(''); };
+            const formatDate = (dateStr) => { const date = new Date(dateStr); return `${date.getMonth() + 1}/${date.getDate()} (${['日','一','二','三','四','五','六'][date.getDay()]})`; };
+
+            return (
+                <div className={`bg-slate-800 border rounded-xl overflow-hidden shadow-sm transition-all ${readOnly ? 'border-slate-700 opacity-80' : 'border-slate-700 hover:shadow-md'}`}>
+                    <div className="bg-slate-900/50 p-4 border-b border-slate-700 flex justify-between items-center">
+                        <h3 className="font-bold text-slate-300 flex items-center gap-2">
+                            <span className="bg-slate-700/50 text-slate-300 px-2 py-0.5 rounded text-xs border border-slate-600">DAY {index + 1}</span> {formatDate(day.date)}
+                        </h3>
+                    </div>
+                    <div className="p-4 space-y-2">
+                        {day.encounters.map(enc => (
+                            <div key={enc.id} className="group flex items-center gap-3 p-2 hover:bg-slate-700/30 rounded-lg transition-colors">
+                                <button onClick={() => onToggleEncounter(enc.id)} disabled={readOnly} className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${enc.checked ? 'bg-teal-700 border-teal-700 text-slate-200' : 'border-slate-600 hover:border-teal-600'} ${readOnly ? 'cursor-default' : ''}`}>
+                                    {enc.checked && <Icons.CheckSquare size={16} />}
+                                </button>
+                                <span className={`flex-1 ${enc.checked ? 'text-slate-600 line-through' : 'text-slate-300'}`}>{enc.text}</span>
+                                {!readOnly && <button onClick={() => onRemoveEncounter(enc.id)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-300 p-1 transition-all"><Icons.Trash2 size={16} /></button>}
+                            </div>
+                        ))}
+                        {!readOnly && (
+                            <form onSubmit={handleAdd} className="flex gap-2 mt-4 pt-2 border-t border-slate-700/50">
+                                <input type="text" placeholder="新增遭遇 (景點、餐廳...)" className="flex-1 bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none" value={input} onChange={e => setInput(e.target.value)} />
+                                <button type="submit" className="text-slate-500 hover:text-slate-300 transition-colors"><Icons.Plus size={20} /></button>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function InventoryPanel({ inventory, onAdd, onToggle, onRemove, readOnly }) {
+            const [input, setInput] = useState('');
+            const handleAdd = (e) => { e.preventDefault(); if (!input.trim()) return; onAdd(input); setInput(''); };
+
+            return (
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 min-h-[400px]">
+                    <h3 className="font-bold text-slate-300 mb-6 flex items-center gap-2"><Icons.Package size={20} className="text-slate-400" /> 裝備背包</h3>
+                    {!readOnly && (
+                        <form onSubmit={handleAdd} className="flex gap-2 mb-6">
+                            <input type="text" placeholder="新增裝備 (護照、充電器...)" className="flex-1 bg-slate-900 border border-slate-600 rounded-lg p-3 text-slate-200 outline-none focus:border-slate-500 transition-colors" value={input} onChange={e => setInput(e.target.value)} />
+                            <button type="submit" className="bg-slate-600 hover:bg-slate-500 text-slate-100 font-bold px-4 rounded-lg transition-colors">放入背包</button>
+                        </form>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {inventory.map(item => (
+                            <div key={item.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${item.packed ? 'bg-slate-900/50 border-teal-900/30' : 'bg-slate-700/30 border-slate-700'}`}>
+                                <button onClick={() => onToggle(item.id)} disabled={readOnly} className={`flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-all ${item.packed ? 'bg-teal-700 border-teal-700 text-slate-200' : 'border-slate-500 hover:border-teal-600'} ${readOnly ? 'cursor-default' : ''}`}>
+                                    {item.packed && <Icons.CheckSquare size={14} />}
+                                </button>
+                                <span className={`flex-1 text-sm ${item.packed ? 'text-slate-600 line-through' : 'text-slate-300'}`}>{item.item}</span>
+                                {!readOnly && <button onClick={() => onRemove(item.id)} className="text-slate-500 hover:text-red-300 p-1"><Icons.Trash2 size={16} /></button>}
+                            </div>
+                        ))}
+                    </div>
+                    {inventory.length === 0 && <div className="text-center text-slate-500 mt-10">背包是空的。</div>}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
